@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CV Review Demo</title>
+</head>
+<body>
+  <h1>CV Review Demo</h1>
+
+  <form id="review-form">
+    <div>
+      <label for="targetRole">Target role</label><br>
+      <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Senior Product Manager">
+    </div>
+    <br>
+    <div>
+      <label for="targetGeography">Target geography</label><br>
+      <input type="text" id="targetGeography" name="targetGeography" placeholder="e.g. United Kingdom">
+    </div>
+    <br>
+    <div>
+      <label for="cv">CV file (.docx)</label><br>
+      <input type="file" id="cv" name="cv" accept=".docx" required>
+    </div>
+    <br>
+    <button type="submit">Analyze</button>
+  </form>
+
+  <p id="loading" style="display: none;">Analyzing CV, please wait...</p>
+  <p id="error" style="display: none; color: red;"></p>
+  <pre id="result"></pre>
+
+  <script src="script.js"></script>
+</body>
+</html>
