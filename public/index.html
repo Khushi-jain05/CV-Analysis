@@ -7,32 +7,42 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="card">
-    <h1>CV Review</h1>
-    <p class="subtitle">Upload a CV and get an instant, hiring-manager style assessment.</p>
+  <div class="layout">
+    <div class="card">
+      <h1>CV Review</h1>
+      <p class="subtitle">Upload a CV and get an instant, hiring-manager style assessment.</p>
 
-    <form id="review-form">
-      <div class="field">
-        <label for="targetRole">Target role</label>
-        <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Senior Product Manager">
-      </div>
+      <form id="review-form">
+        <div class="field">
+          <label for="targetRole">Target role</label>
+          <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Senior Product Manager">
+        </div>
 
-      <div class="field">
-        <label for="targetGeography">Target geography</label>
-        <input type="text" id="targetGeography" name="targetGeography" placeholder="e.g. United Kingdom">
-      </div>
+        <div class="field">
+          <label for="targetGeography">Target geography</label>
+          <input type="text" id="targetGeography" name="targetGeography" placeholder="e.g. United Kingdom">
+        </div>
 
-      <div class="field">
-        <label for="cv">CV file (.docx or .pdf)</label>
-        <input type="file" id="cv" name="cv" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
-      </div>
+        <div class="field">
+          <label for="cv">CV file (.docx or .pdf)</label>
+          <input type="file" id="cv" name="cv" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+        </div>
 
-      <button type="submit" id="submit-btn">Analyze</button>
-    </form>
+        <button type="submit" id="submit-btn">Analyze</button>
+      </form>
 
-    <div id="loading"><span class="spinner"></span><span>Analyzing CV, please wait...</span></div>
-    <div id="error"></div>
-    <pre id="result"></pre>
+      <div id="loading"><span class="spinner"></span><span>Analyzing CV, please wait...</span></div>
+      <div id="error"></div>
+      <div id="candidate"></div>
+      <pre id="result"></pre>
+    </div>
+
+    <aside class="note-panel">
+      <h2>How we handle personal data</h2>
+      <p>Before anything is sent to the AI, the server scans the extracted CV text locally for the candidate's name, email, and phone number and replaces them with placeholders. Groq only ever analyzes this redacted text — personal identifiers never leave our server for the third-party model.</p>
+      <p>The name/email/phone shown next to your result come from that local extraction, not from the AI, so you still see your own details even though the AI never received them.</p>
+      <p>Detection here uses a simple heuristic (first line of the CV, plus email/phone patterns) — good enough for this demo. A production build would use a proper PII-detection library for more reliable coverage.</p>
+    </aside>
   </div>
 
   <script src="script.js"></script>
