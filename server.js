@@ -50,8 +50,31 @@ const SECTION_HEADINGS = new Set([
 ]);
 
 
+// Lowercase letters only — canonical form for comparing text against the email local-part.
+function letters(s) {
+  return s.toLowerCase().replace(/[^a-z]/g, '');
+}
+
 function cleanNameLine(line) {
   return line.replace(/[^A-Za-z'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Headline names are often typeset letter-spaced, so PDF extraction yields
+// "P A Y A L  A D W A N I". Collapse mostly-single-letter lines: 2+ space gaps
+// delimit words, single spaces within a group are removed.
+function isLetterSpaced(line) {
+  const tokens = line.trim().split(/\s+/);
+  const singles = tokens.filter((t) => /^[A-Za-z]$/.test(t)).length;
+  return tokens.length >= 4 && singles / tokens.length >= 0.7;
+}
+
+function collapseSpacedLetters(line) {
+  if (!isLetterSpaced(line)) return line;
+  return line
+    .trim()
+    .split(/\s{2,}/)
+    .map((group) => group.replace(/\s+/g, ''))
+    .join(' ');
 }
 
 
@@ -75,19 +98,28 @@ function isNameCandidate(line) {
 
 
 function detectName(lines, email) {
-  const letters = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
-
   if (email) {
     const localPart = letters(email.split('@')[0]);
     let best = null;
     for (const line of lines) {
       if (EMAIL_REGEX.test(line)) continue;
       const words = nameWords(line);
-      for (let size = Math.min(4, words.length); size >= 2; size--) {
+      // Windows of 1-4 adjacent words whose letters appear contiguously in the email
+      // local-part. Sizes 2-4 (min 5 letters) catch normal and merged lines. Size 1
+      // catches names the PDF glued into a single token ("PAYALADWANI") — held to a
+      // stricter bar (not a section heading, covers ≥80% of the local-part) so incidental
+      // words like "CONTACT" inside "hr.contact99" can't match.
+      for (let size = Math.min(4, words.length); size >= 1; size--) {
         for (let i = 0; i + size <= words.length; i++) {
           const window = words.slice(i, i + size);
           const concat = letters(window.join(''));
-          if (concat.length >= 5 && localPart.includes(concat)) {
+          const strongEnough =
+            size === 1
+              ? concat.length >= 6 &&
+                concat.length >= localPart.length * 0.8 &&
+                !SECTION_HEADINGS.has(window[0].toLowerCase())
+              : concat.length >= 5;
+          if (strongEnough && localPart.includes(concat)) {
             const candidate = window.join(' ');
             if (!best || candidate.length > best.length) best = candidate;
           }
@@ -106,7 +138,10 @@ function detectName(lines, email) {
 }
 
 function extractPII(text) {
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .split('\n')
+    .map((l) => collapseSpacedLetters(l.trim()))
+    .filter(Boolean);
   const emailMatch = text.match(EMAIL_REGEX);
   const phoneMatch = text.match(PHONE_REGEX);
   const email = emailMatch ? emailMatch[0] : null;
@@ -121,7 +156,18 @@ function extractPII(text) {
 // Strips the locally-detected identifiers out of the text before it ever reaches the AI provider.
 function redactPII(text, pii) {
   let redacted = text;
-  if (pii.name) redacted = redacted.split(pii.name).join('[REDACTED NAME]');
+  if (pii.name) {
+    redacted = redacted.split(pii.name).join('[REDACTED NAME]');
+    // The name may have been detected from a collapsed letter-spaced/glued line, in which
+    // case it doesn't appear verbatim above — redact any raw line whose letters match it.
+    const nameLetters = letters(pii.name);
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed && trimmed !== pii.name && letters(trimmed) === nameLetters) {
+        redacted = redacted.split(trimmed).join('[REDACTED NAME]');
+      }
+    }
+  }
   if (pii.email) redacted = redacted.split(pii.email).join('[REDACTED EMAIL]');
   if (pii.phone) redacted = redacted.split(pii.phone).join('[REDACTED PHONE]');
   return redacted;
@@ -190,3 +236,4 @@ if (require.main === module) {
 module.exports = app;
 // Exported for local testing of the PII heuristics.
 module.exports.extractPII = extractPII;
+module.exports.redactPII = redactPII;
