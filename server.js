@@ -1,13 +1,5 @@
 // Production notes:
-// - API key: the Groq key only ever lives here on the server, read from an env var / secrets
-//   manager (never sent to or embedded in the browser bundle). In production I'd load it via the
-//   platform's secret store (e.g. AWS Secrets Manager, Vercel/Render env vars) with rotation, not a
-//   plain .env file committed anywhere.
-// - Personal data: name/email/phone are detected locally (see extractPII below) and redacted from
-//   the text before it is sent to Groq, so the third-party AI provider never sees them — the
-//   redacted values are re-attached to the response purely from local extraction, not from the AI.
-//   The detection here is a simple heuristic good enough for a demo; production would swap it for a
-//   proper NER/PII-detection library and also confirm a no-training/no-retention agreement with Groq.
+
 
 require('dotenv').config();
 
@@ -22,7 +14,7 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Placeholder — replace with the exact prompt text once provided.
+
 const REVIEW_PROMPT = `You are a career advisor. When given a CV, a target role, and a target geography, review the CV the way an experienced hiring manager would, then produce a short assessment.
 
 First, work out privately: the candidate's seniority level and function, and the 4-5 things a hiring manager for this specific role would actually check on a CV (choose what's relevant to this role, don't use a fixed generic list).
@@ -37,14 +29,11 @@ Rules: never invent CV content not present in the source. No scores, no percenta
 
 const SUPPORTED_EXTENSIONS = ['.docx', '.pdf'];
 
-// TLD restricted to lowercase so a glued-on word right after the email (e.g. a resume
-// header with no space before "LinkedIn") isn't swallowed into the match.
+
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,24}/;
 const PHONE_REGEX = /(\+?\d[\d\s().-]{7,}\d)/;
 
-// Common resume section headings. Two-column / sidebar layouts often get these extracted
-// before the actual name (a single word like "EDUCATION" otherwise looks name-like), so we
-// skip them. Normalized to lowercase with collapsed whitespace before lookup.
+
 const SECTION_HEADINGS = new Set([
   'education', 'skills', 'technical skills', 'soft skills', 'core competencies', 'competencies',
   'contact', 'contact information', 'contact details', 'personal details', 'personal information',
@@ -60,14 +49,18 @@ const SECTION_HEADINGS = new Set([
   'leadership', 'affiliations', 'memberships',
 ]);
 
-// Strips anything that isn't a letter, space, or name punctuation — removes icon glyphs (e.g. a
-// LinkedIn badge glued onto the name line), bullets, pipes, etc. that otherwise break detection.
+
 function cleanNameLine(line) {
-  return line.replace(/[^A-Za-z.'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return line.replace(/[^A-Za-z'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// A plausible name: 2-4 alphabetic words, not a known section heading. Rules out single-word
-// headers ("EDUCATION") and multi-word ones ("WORK EXPERIENCE") regardless of column layout.
+
+function nameWords(line) {
+  return cleanNameLine(line)
+    .split(' ')
+    .filter((w) => w.length >= 2 && /^[A-Za-z][A-Za-z'’-]*$/.test(w));
+}
+
 function isNameCandidate(line) {
   const words = line.split(' ').filter(Boolean);
   return (
@@ -76,33 +69,40 @@ function isNameCandidate(line) {
     words.length >= 2 &&
     words.length <= 4 &&
     !SECTION_HEADINGS.has(line.toLowerCase()) &&
-    words.every((w) => /^[A-Za-z][A-Za-z.'’-]*$/.test(w))
+    words.every((w) => /^[A-Za-z][A-Za-z'’-]*$/.test(w))
   );
 }
 
-// Heuristic, local-only name detection — good enough for a demo; production would use a proper
-// NER/PII library. Among plausible lines, prefer the one whose words appear in the email
-// local-part (a strong signal it's the real name, not a job title), else take the first.
+
 function detectName(lines, email) {
-  const candidates = lines.map(cleanNameLine).filter(isNameCandidate);
-  if (candidates.length === 0) return null;
+  const letters = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
 
   if (email) {
-    const localPart = email.split('@')[0].toLowerCase().replace(/[^a-z]/g, '');
+    const localPart = letters(email.split('@')[0]);
     let best = null;
-    let bestScore = 0;
-    for (const candidate of candidates) {
-      const words = candidate.toLowerCase().split(' ');
-      const score = words.filter((w) => w.length >= 2 && localPart.includes(w)).length;
-      if (score > bestScore) {
-        bestScore = score;
-        best = candidate;
+    for (const line of lines) {
+      if (EMAIL_REGEX.test(line)) continue;
+      const words = nameWords(line);
+      for (let size = Math.min(4, words.length); size >= 2; size--) {
+        for (let i = 0; i + size <= words.length; i++) {
+          const window = words.slice(i, i + size);
+          const concat = letters(window.join(''));
+          if (concat.length >= 5 && localPart.includes(concat)) {
+            const candidate = window.join(' ');
+            if (!best || candidate.length > best.length) best = candidate;
+          }
+        }
       }
     }
     if (best) return best;
   }
 
-  return candidates[0];
+  for (const line of lines) {
+    if (EMAIL_REGEX.test(line) || /\d/.test(line)) continue;
+    const cleaned = cleanNameLine(line);
+    if (isNameCandidate(cleaned)) return cleaned;
+  }
+  return null;
 }
 
 function extractPII(text) {
