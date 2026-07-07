@@ -1,0 +1,16 @@
+{
+  "name": "cv-ai-review-demo",
+  "version": "1.0.0",
+  "description": "Upload a CV, extract its text, send it to Groq for an AI review, and display the result.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.7.0",
+    "mammoth": "^1.7.2",
+    "multer": "^2.2.0"
+  }
+}
