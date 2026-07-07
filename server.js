@@ -100,29 +100,33 @@ function isNameCandidate(line) {
 function detectName(lines, email) {
   if (email) {
     const localPart = letters(email.split('@')[0]);
-    let best = null;
+    // Flatten words across lines (skipping email lines) so the window can span line
+    // breaks — headline names often extract with each word on its own line
+    // ("PAYAL" / "ADWANI") because bold and light spans are separate text items.
+    const stream = [];
     for (const line of lines) {
       if (EMAIL_REGEX.test(line)) continue;
-      const words = nameWords(line);
-      // Windows of 1-4 adjacent words whose letters appear contiguously in the email
-      // local-part. Sizes 2-4 (min 5 letters) catch normal and merged lines. Size 1
-      // catches names the PDF glued into a single token ("PAYALADWANI") — held to a
-      // stricter bar (not a section heading, covers ≥80% of the local-part) so incidental
-      // words like "CONTACT" inside "hr.contact99" can't match.
-      for (let size = Math.min(4, words.length); size >= 1; size--) {
-        for (let i = 0; i + size <= words.length; i++) {
-          const window = words.slice(i, i + size);
-          const concat = letters(window.join(''));
-          const strongEnough =
-            size === 1
-              ? concat.length >= 6 &&
-                concat.length >= localPart.length * 0.8 &&
-                !SECTION_HEADINGS.has(window[0].toLowerCase())
-              : concat.length >= 5;
-          if (strongEnough && localPart.includes(concat)) {
-            const candidate = window.join(' ');
-            if (!best || candidate.length > best.length) best = candidate;
-          }
+      stream.push(...nameWords(line));
+    }
+    // Windows of 1-4 adjacent words whose letters appear contiguously in the email
+    // local-part. Sizes 2-4 (min 5 letters) catch normal, merged, and line-split names.
+    // Size 1 catches names glued into a single token ("PAYALADWANI") — held to a
+    // stricter bar (not a section heading, covers ≥80% of the local-part) so incidental
+    // words like "CONTACT" inside "hr.contact99" can't match.
+    let best = null;
+    for (let size = Math.min(4, stream.length); size >= 1; size--) {
+      for (let i = 0; i + size <= stream.length; i++) {
+        const window = stream.slice(i, i + size);
+        const concat = letters(window.join(''));
+        const strongEnough =
+          size === 1
+            ? concat.length >= 6 &&
+              concat.length >= localPart.length * 0.8 &&
+              !SECTION_HEADINGS.has(window[0].toLowerCase())
+            : concat.length >= 5;
+        if (strongEnough && localPart.includes(concat)) {
+          const candidate = window.join(' ');
+          if (!best || candidate.length > best.length) best = candidate;
         }
       }
     }
@@ -166,6 +170,11 @@ function redactPII(text, pii) {
       if (trimmed && trimmed !== pii.name && letters(trimmed) === nameLetters) {
         redacted = redacted.split(trimmed).join('[REDACTED NAME]');
       }
+    }
+    // The name may also span multiple lines ("PAYAL" / "ADWANI" as separate text items),
+    // so the joined form never appears verbatim — redact each name word individually.
+    for (const word of pii.name.split(' ')) {
+      if (word.length >= 4) redacted = redacted.split(word).join('[REDACTED NAME]');
     }
   }
   if (pii.email) redacted = redacted.split(pii.email).join('[REDACTED EMAIL]');
