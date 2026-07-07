@@ -42,15 +42,42 @@ const SUPPORTED_EXTENSIONS = ['.docx', '.pdf'];
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,24}/;
 const PHONE_REGEX = /(\+?\d[\d\s().-]{7,}\d)/;
 
-// Heuristic, local-only PII detection — good enough for a demo. A production build would
-// use a proper NER/PII-detection library instead of a short-plain-line-is-the-name guess.
+// Common resume section headings. Two-column / sidebar layouts often get these extracted
+// before the actual name (a single word like "EDUCATION" otherwise looks name-like), so we
+// skip them. Normalized to lowercase with collapsed whitespace before lookup.
+const SECTION_HEADINGS = new Set([
+  'education', 'skills', 'technical skills', 'soft skills', 'core competencies', 'competencies',
+  'contact', 'contact information', 'contact details', 'personal details', 'personal information',
+  'experience', 'work experience', 'professional experience', 'work history', 'employment',
+  'employment history', 'career', 'career history', 'internships', 'internship',
+  'certifications', 'certification', 'courses', 'training', 'qualifications',
+  'academic qualifications', 'projects', 'project', 'portfolio',
+  'summary', 'professional summary', 'career summary', 'objective', 'career objective',
+  'profile', 'about', 'about me', 'declaration',
+  'achievements', 'key achievements', 'accomplishments', 'awards', 'honors', 'awards and honors',
+  'languages', 'interests', 'hobbies', 'activities', 'extracurricular', 'references',
+  'publications', 'volunteer', 'volunteering', 'strengths', 'expertise', 'areas of expertise',
+  'leadership', 'affiliations', 'memberships',
+]);
+
+// Only letters plus name punctuation (. ' -), each word starting with a letter.
+const NAME_WORD_PATTERN = /^[A-Za-z][A-Za-z.'’-]*(\s+[A-Za-z][A-Za-z.'’-]*)+$/;
+
+// Heuristic, local-only name detection — good enough for a demo. A production build would use a
+// proper NER/PII-detection library instead of a first-plausible-line guess. Requires 2-4 alphabetic
+// words (skips single-word headers like "EDUCATION") and excludes known section headings.
 function looksLikeName(line) {
+  const normalized = line.toLowerCase().replace(/\s+/g, ' ').trim();
+  const wordCount = line.trim().split(/\s+/).length;
   return (
-    line.length > 0 &&
-    line.length <= 60 &&
-    line.split(/\s+/).length <= 5 &&
+    line.length >= 3 &&
+    line.length <= 40 &&
+    wordCount >= 2 &&
+    wordCount <= 4 &&
+    !SECTION_HEADINGS.has(normalized) &&
     !EMAIL_REGEX.test(line) &&
-    !/\d/.test(line)
+    !/\d/.test(line) &&
+    NAME_WORD_PATTERN.test(line.trim())
   );
 }
 
@@ -138,3 +165,5 @@ if (require.main === module) {
 }
 
 module.exports = app;
+// Exported for local testing of the PII heuristics.
+module.exports.extractPII = extractPII;
