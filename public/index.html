@@ -45,7 +45,7 @@
         <h2>How we handle personal data</h2>
         <p>Before anything is sent to the AI, the server scans the extracted CV text locally for the candidate's name, email, and phone number and replaces them with placeholders. Groq only ever analyzes this redacted text — personal identifiers never leave our server for the third-party model.</p>
         <p>The name/email/phone shown next to your result come from that local extraction, not from the AI, so you still see your own details even though the AI never received them.</p>
-        <p>Detection here uses a simple heuristic (first line of the CV, plus email/phone patterns) — good enough for this demo. A production build would use a proper PII-detection library for more reliable coverage.</p>
+        <p>Detection here uses a lightweight heuristic — email/phone patterns, plus name detection that matches likely name lines against the email — good enough for this demo. A production build would use a proper PII-detection library for more reliable coverage.</p>
       </aside>
     </div>
   </div>

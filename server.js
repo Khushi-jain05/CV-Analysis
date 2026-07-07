@@ -60,37 +60,60 @@ const SECTION_HEADINGS = new Set([
   'leadership', 'affiliations', 'memberships',
 ]);
 
-// Only letters plus name punctuation (. ' -), each word starting with a letter.
-const NAME_WORD_PATTERN = /^[A-Za-z][A-Za-z.'’-]*(\s+[A-Za-z][A-Za-z.'’-]*)+$/;
+// Strips anything that isn't a letter, space, or name punctuation — removes icon glyphs (e.g. a
+// LinkedIn badge glued onto the name line), bullets, pipes, etc. that otherwise break detection.
+function cleanNameLine(line) {
+  return line.replace(/[^A-Za-z.'’\- ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
-// Heuristic, local-only name detection — good enough for a demo. A production build would use a
-// proper NER/PII-detection library instead of a first-plausible-line guess. Requires 2-4 alphabetic
-// words (skips single-word headers like "EDUCATION") and excludes known section headings.
-function looksLikeName(line) {
-  const normalized = line.toLowerCase().replace(/\s+/g, ' ').trim();
-  const wordCount = line.trim().split(/\s+/).length;
+// A plausible name: 2-4 alphabetic words, not a known section heading. Rules out single-word
+// headers ("EDUCATION") and multi-word ones ("WORK EXPERIENCE") regardless of column layout.
+function isNameCandidate(line) {
+  const words = line.split(' ').filter(Boolean);
   return (
     line.length >= 3 &&
     line.length <= 40 &&
-    wordCount >= 2 &&
-    wordCount <= 4 &&
-    !SECTION_HEADINGS.has(normalized) &&
-    !EMAIL_REGEX.test(line) &&
-    !/\d/.test(line) &&
-    NAME_WORD_PATTERN.test(line.trim())
+    words.length >= 2 &&
+    words.length <= 4 &&
+    !SECTION_HEADINGS.has(line.toLowerCase()) &&
+    words.every((w) => /^[A-Za-z][A-Za-z.'’-]*$/.test(w))
   );
+}
+
+// Heuristic, local-only name detection — good enough for a demo; production would use a proper
+// NER/PII library. Among plausible lines, prefer the one whose words appear in the email
+// local-part (a strong signal it's the real name, not a job title), else take the first.
+function detectName(lines, email) {
+  const candidates = lines.map(cleanNameLine).filter(isNameCandidate);
+  if (candidates.length === 0) return null;
+
+  if (email) {
+    const localPart = email.split('@')[0].toLowerCase().replace(/[^a-z]/g, '');
+    let best = null;
+    let bestScore = 0;
+    for (const candidate of candidates) {
+      const words = candidate.toLowerCase().split(' ');
+      const score = words.filter((w) => w.length >= 2 && localPart.includes(w)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    if (best) return best;
+  }
+
+  return candidates[0];
 }
 
 function extractPII(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  const name = lines.find(looksLikeName) || null;
-
   const emailMatch = text.match(EMAIL_REGEX);
   const phoneMatch = text.match(PHONE_REGEX);
+  const email = emailMatch ? emailMatch[0] : null;
 
   return {
-    name,
-    email: emailMatch ? emailMatch[0] : null,
+    name: detectName(lines, email),
+    email,
     phone: phoneMatch ? phoneMatch[0].trim() : null,
   };
 }
