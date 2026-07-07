@@ -11,6 +11,7 @@
     "express": "^4.19.2",
     "groq-sdk": "^0.7.0",
     "mammoth": "^1.7.2",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "pdf-parse": "^1.1.1"
   }
 }

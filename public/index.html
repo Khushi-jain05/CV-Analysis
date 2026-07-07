@@ -2,33 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CV Review Demo</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>CV Review Demo</h1>
+  <div class="card">
+    <h1>CV Review</h1>
+    <p class="subtitle">Upload a CV and get an instant, hiring-manager style assessment.</p>
 
-  <form id="review-form">
-    <div>
-      <label for="targetRole">Target role</label><br>
-      <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Senior Product Manager">
-    </div>
-    <br>
-    <div>
-      <label for="targetGeography">Target geography</label><br>
-      <input type="text" id="targetGeography" name="targetGeography" placeholder="e.g. United Kingdom">
-    </div>
-    <br>
-    <div>
-      <label for="cv">CV file (.docx)</label><br>
-      <input type="file" id="cv" name="cv" accept=".docx" required>
-    </div>
-    <br>
-    <button type="submit">Analyze</button>
-  </form>
+    <form id="review-form">
+      <div class="field">
+        <label for="targetRole">Target role</label>
+        <input type="text" id="targetRole" name="targetRole" placeholder="e.g. Senior Product Manager">
+      </div>
 
-  <p id="loading" style="display: none;">Analyzing CV, please wait...</p>
-  <p id="error" style="display: none; color: red;"></p>
-  <pre id="result"></pre>
+      <div class="field">
+        <label for="targetGeography">Target geography</label>
+        <input type="text" id="targetGeography" name="targetGeography" placeholder="e.g. United Kingdom">
+      </div>
+
+      <div class="field">
+        <label for="cv">CV file (.docx or .pdf)</label>
+        <input type="file" id="cv" name="cv" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+      </div>
+
+      <button type="submit" id="submit-btn">Analyze</button>
+    </form>
+
+    <div id="loading"><span class="spinner"></span><span>Analyzing CV, please wait...</span></div>
+    <div id="error"></div>
+    <pre id="result"></pre>
+  </div>
 
   <script src="script.js"></script>
 </body>

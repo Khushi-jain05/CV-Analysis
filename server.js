@@ -9,9 +9,11 @@
 
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const multer = require('multer');
 const mammoth = require('mammoth');
+const pdfParse = require('pdf-parse');
 const Groq = require('groq-sdk');
 
 const app = express();
@@ -31,6 +33,8 @@ Then output, in this order:
 
 Rules: never invent CV content not present in the source. No scores, no percentages, tiers only. Plain, direct language, no hype, no filler praise. Keep the whole output under 280 words.`;
 
+const SUPPORTED_EXTENSIONS = ['.docx', '.pdf'];
+
 app.use(express.static('public'));
 
 app.post('/api/analyze', upload.single('cv'), async (req, res) => {
@@ -38,15 +42,25 @@ app.post('/api/analyze', upload.single('cv'), async (req, res) => {
     return res.status(400).json({ error: 'No CV file was uploaded.' });
   }
 
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+    return res.status(400).json({ error: 'Unsupported file type. Please upload a .docx or .pdf file.' });
+  }
+
   const targetRole = (req.body.targetRole || '').trim();
   const targetGeography = (req.body.targetGeography || '').trim();
 
   let cvText;
   try {
-    const { value } = await mammoth.extractRawText({ buffer: req.file.buffer });
-    cvText = value.trim();
+    if (ext === '.pdf') {
+      const { text } = await pdfParse(req.file.buffer);
+      cvText = text.trim();
+    } else {
+      const { value } = await mammoth.extractRawText({ buffer: req.file.buffer });
+      cvText = value.trim();
+    }
   } catch (err) {
-    return res.status(400).json({ error: 'Could not read the uploaded file. Please upload a valid .docx file.' });
+    return res.status(400).json({ error: 'Could not read the uploaded file. Please upload a valid .docx or .pdf file.' });
   }
 
   if (!cvText) {
